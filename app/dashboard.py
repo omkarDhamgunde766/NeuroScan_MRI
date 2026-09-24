@@ -2,11 +2,11 @@ import streamlit as st
 import numpy as np
 import cv2
 from PIL import Image
+
 import os
 import sys
 import time
-import pyttsx3
-import speech_recognition as sr
+
 
 # Ensure project root is in python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -14,7 +14,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from neuroscan.inference import NeuroScanPipeline
 from neuroscan.visualizer import plot_confidence_bar
 
-from neuroscan.local_agent import ask_local_agent
+
 # =====================================================
 # PAGE CONFIGURATION
 # =====================================================
@@ -45,7 +45,12 @@ st.markdown("""
 
     /* ——— Deep Space Background ——— */
     .stApp {
-        background: #08090D;
+        background:
+            radial-gradient(circle at 12% 8%, rgba(40, 217, 243, 0.08), transparent 28%),
+            radial-gradient(circle at 88% 12%, rgba(100, 80, 255, 0.08), transparent 30%),
+            radial-gradient(circle at 50% 90%, rgba(35, 85, 204, 0.05), transparent 35%),
+            #070A12;
+        color: #F5F7FF;
     }
 
     /* ——— Sidebar styling ——— */
@@ -372,6 +377,7 @@ st.markdown("""
         font-weight: 700;
         color: #e1e2eb;
     }
+
     /* ——— OOD Validation Alert ——— */
     .ood-alert {
         background: rgba(255, 100, 80, 0.08);
@@ -448,6 +454,63 @@ st.markdown("""
         font-size: 20px;
         flex-shrink: 0;
     }
+
+    /* ——— Modern NeuroScan Brand ——— */
+    .neuro-sidebar-brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 4px 18px 4px;
+    }
+    .neuro-logo {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, rgba(40,217,243,.20), rgba(100,80,255,.20));
+        border: 1px solid rgba(40,217,243,.25);
+        box-shadow: 0 0 25px rgba(40,217,243,.12);
+        font-size: 23px;
+    }
+    .neuro-brand-title {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 21px;
+        font-weight: 700;
+        letter-spacing: -.5px;
+        color: #F4F7FF;
+    }
+    .neuro-brand-subtitle {
+        margin-top: 2px;
+        font-size: 11px;
+        letter-spacing: .8px;
+        text-transform: uppercase;
+        color: rgba(190,198,220,.55);
+    }
+    .sidebar-status {
+        display:flex; align-items:center; gap:8px;
+        padding:8px 11px; margin-bottom:18px; border-radius:10px;
+        background:rgba(40,217,243,.06);
+        border:1px solid rgba(40,217,243,.12);
+        color:rgba(150,235,245,.85); font-size:10px; font-weight:600; letter-spacing:.8px;
+    }
+    .status-dot { width:7px; height:7px; border-radius:50%; background:#28D9F3; box-shadow:0 0 10px #28D9F3; }
+    .modern-topbar {
+        display:flex; justify-content:space-between; align-items:center; gap:16px;
+        padding:14px 18px; margin-bottom:22px; border-radius:18px;
+        background:rgba(15,20,32,.62); border:1px solid rgba(148,163,184,.10);
+        backdrop-filter:blur(18px);
+    }
+    .topbar-title { font-size:13px; font-weight:700; color:#EAF0FF; letter-spacing:.3px; }
+    .topbar-subtitle { font-size:10px; color:rgba(190,198,220,.55); margin-top:3px; }
+    .online-pill {
+        display:inline-flex; align-items:center; gap:7px; padding:7px 11px; border-radius:999px;
+        background:rgba(40,217,243,.07); border:1px solid rgba(40,217,243,.16);
+        color:#8FEAF5; font-size:10px; font-weight:700; letter-spacing:.6px;
+    }
+    .online-pill .status-dot { width:6px; height:6px; }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -465,10 +528,14 @@ pipeline = load_pipeline()
 # =====================================================
 with st.sidebar:
     st.markdown("""
-    <div style="margin-bottom: 2rem;">
-        <h1 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 24px; font-weight: 700; color: #b4c5ff; text-shadow: 0 0 15px rgba(180,197,255,0.4); margin-bottom: 0;">NeuroScan</h1>
-        <p style="font-family: 'Geist', sans-serif; font-size: 14px; color: rgba(195,198,214,0.7); margin-top: 4px;">Precision Diagnostics</p>
+    <div class="neuro-sidebar-brand">
+        <div class="neuro-logo">🧠</div>
+        <div>
+            <div class="neuro-brand-title">NeuroScan</div>
+            <div class="neuro-brand-subtitle">MRI Intelligence</div>
+        </div>
     </div>
+    <div class="sidebar-status"><span class="status-dot"></span>MODEL SYSTEM ONLINE</div>
     """, unsafe_allow_html=True)
 
     page = st.radio("Navigation", ["🔬 Live Scan", "🕒 History", "📂 Patient Records", "⚙️ Settings"], label_visibility="collapsed")
@@ -590,31 +657,20 @@ def get_severity_badge(pred_class):
 # HELPER: Analysis summary descriptions
 # =====================================================
 def get_analysis_summary(pred_class):
-    """Returns contextual analysis summary based on prediction."""
-    summaries = {
-        'glioma': {
-            'morphology': 'Intra-axial mass',
-            'localization': 'Cerebral hemisphere',
-            'vascularity': 'High hyperintensity'
-        },
-        'meningioma': {
-            'morphology': 'Extra-axial mass',
-            'localization': 'Frontal Lobe Sulcus',
-            'vascularity': 'Moderate hyperintensity'
-        },
-        'pituitary': {
-            'morphology': 'Sellar mass',
-            'localization': 'Pituitary fossa',
-            'vascularity': 'Mild enhancement'
-        },
-        'notumor': {
-            'morphology': 'No anomaly detected',
-            'localization': 'N/A',
-            'vascularity': 'Normal signal intensity'
+    """Model-only summary. Do not infer anatomy or tumor morphology from the class label."""
+    key = str(pred_class).lower().replace(' ', '')
+    if key == 'notumor':
+        return {
+            'morphology': 'Not provided by model',
+            'localization': 'Not provided by model',
+            'vascularity': 'Not provided by model'
         }
+    return {
+        'morphology': 'Not directly measured',
+        'localization': 'Not directly measured',
+        'vascularity': 'Not directly measured'
     }
-    key = pred_class.lower().replace(' ', '')
-    return summaries.get(key, summaries['notumor'])
+
 
 # =====================================================
 # PAGES
@@ -623,6 +679,16 @@ def get_analysis_summary(pred_class):
 if page == "🔬 Live Scan":
     st.markdown('<div class="hero-title">NeuroScan Analytics</div>', unsafe_allow_html=True)
     st.markdown('<div class="hero-subtitle">Automated MRI Pathology Identification via Attention U-Net & EfficientNetV2B0</div>', unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="modern-topbar">
+        <div>
+            <div class="topbar-title">Brain MRI Intelligence Dashboard</div>
+            <div class="topbar-subtitle">Research prototype • Segmentation • Classification • Explainability</div>
+        </div>
+        <div class="online-pill"><span class="status-dot"></span>MODELS ONLINE</div>
+    </div>
+    """, unsafe_allow_html=True)
 
     if pipeline.seg_model is None or pipeline.cls_model is None:
         st.warning("⚠️ Models not loaded. Run the training scripts to generate `.keras` checkpoints in `checkpoints/`.")
@@ -673,39 +739,6 @@ if page == "🔬 Live Scan":
 
         start_time = time.time()
         results = pipeline.process_image(open_cv_image)
-        agent_explanation = ask_local_agent(results)
-        if st.button("🎤 Talk to NeuroScan AI"):
-          recognizer = sr.Recognizer()
-          try:
-              with sr.Microphone() as source:
-                  st.info("🎤 Listening... Please speak.")
-                  recognizer.adjust_for_ambient_noise(source, duration=1)
-                  audio = recognizer.listen(source, timeout=5)
-
-              question = recognizer.recognize_google(audio)
-
-              st.success(f"You said: {question}")
-
-          except sr.WaitTimeoutError:
-              st.warning("No speech detected.")
-
-          except sr.UnknownValueError:
-              st.warning("Could not understand your speech.")
-
-          except sr.RequestError:
-              st.error("Speech recognition service is unavailable.")
-         
-          
-        engine = pyttsx3.init()
-        if st.button("🔊 Speak AI Explanation"):
-            engine.say(agent_explanation)
-            engine.runAndWait()
-        st.markdown("---")
-        st.markdown(
-            '<p class="section-label">🤖 NeuroScan AI Assistant</p>',
-            unsafe_allow_html=True
-        )
-        st.info(agent_explanation)
         latency = int((time.time() - start_time) * 1000)
 
         progress_bar.progress(90, text="Classifying Pathology (EfficientNetV2B0)...")
@@ -812,7 +845,7 @@ if page == "🔬 Live Scan":
             st.plotly_chart(fig, use_container_width=True)
 
         with col_summary:
-            st.markdown('<p class="section-label">Clinical Details</p>', unsafe_allow_html=True)
+            st.markdown('<p class="section-label">Model Summary</p>', unsafe_allow_html=True)
             summary = get_analysis_summary(pred_class)
             st.markdown(f"""
             <div class="glass-panel summary-card" style="height: 380px;">
@@ -843,8 +876,8 @@ if page == "🔬 Live Scan":
 
             st.markdown("<br>", unsafe_allow_html=True)
             st.download_button(
-                "📄 Generate Clinical Report",
-                data=f"NeuroScan Clinical Report\n{'='*40}\nPathology: {pred_class.upper()}\nConfidence: {confidence_pct:.1f}%\nMorphology: {summary['morphology']}\nLocalization: {summary['localization']}\nVascularity: {summary['vascularity']}\nModel: EfficientNetV2B0\nLatency: {latency}ms\n",
+                "📄 Generate Model Report",
+                data=f"NeuroScan Model Report\n{'='*40}\nPathology: {pred_class.upper()}\nConfidence: {confidence_pct:.1f}%\nMorphology: {summary['morphology']}\nLocalization: {summary['localization']}\nVascularity: {summary['vascularity']}\nModel: EfficientNetV2B0\nLatency: {latency}ms\n",
                 file_name=f"neuroscan_report_{pred_class}.txt",
                 mime="text/plain",
                 use_container_width=True,
