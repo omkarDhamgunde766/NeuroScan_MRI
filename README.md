@@ -1,284 +1,494 @@
-# NeuroScan: MRI Pathology Analysis Pipeline 🧠
+# NeuroScan-MRI: Brain MRI Tumor Analysis 🧠
 
-NeuroScan is an end-to-end computer vision pipeline for segmentation and classification of brain tumor pathologies from MRI scans. It combines an attention-based segmentation model with a transfer-learning classifier, and adds explainability through Grad-CAM heatmaps.
+NeuroScan-MRI is an end-to-end deep learning research prototype for brain MRI tumor segmentation, multi-class tumor classification, and model explainability.
 
-The pipeline takes a raw MRI scan, localizes the region of interest, classifies the tumor type, and visualizes which regions drove the model's decision.
+The system combines an Attention U-Net segmentation model with an EfficientNetV2B0 classification model and uses Grad-CAM to provide visual explanations of classification predictions.
 
----
+The application provides an interactive Streamlit dashboard and a FastAPI inference layer for processing MRI scans.
 
-## 🏗️ Architecture Overview
-
-```
-                             ┌────────────────────┐
-                             │    Raw MRI Scan    │
-                             │    (224 x 224)     │
-                             └─────────┬──────────┘
-                                       │
-                                       ▼
-                      ┌─────────────────────────────────┐
-                      │         Attention U-Net         │
-                      │  (SeparableConv2D + Attention   │
-                      │     Gates, BCE + Dice Loss)     │
-                      └────────────────┬────────────────┘
-                                       │
-                               Segmentation Mask
-                                       │
-                                       ▼
-                      ┌─────────────────────────────────┐
-                      │    Region of Interest (ROI)     │
-                      │           Extraction            │
-                      └────────────────┬────────────────┘
-                                       │
-                                       ▼
-                      ┌─────────────────────────────────┐
-                      │        EfficientNetV2B0         │
-                      │ (Transfer Learning Classifier)  │
-                      └────────────────┬────────────────┘
-                                       │
-                      ┌────────────────┴────────────────┐
-                      ▼                                 ▼
-           ┌─────────────────────┐         ┌─────────────────────────┐
-           │   Predicted Class   │         │        Grad-CAM         │
-           │ Glioma / Meningioma │         │ Explainability Heatmap  │
-           │ Pituitary/No Tumor  │         │                         │
-           └──────────┬──────────┘         └────────────┬────────────┘
-                      │                                 │
-                      └────────────────┬────────────────┘
-                                       ▼
-                      ┌─────────────────────────────────┐
-                      │    Streamlit Dashboard (UI)     │
-                      │  + FastAPI Inference Endpoint   │
-                      └─────────────────────────────────┘
-```
+> **Note:** NeuroScan-MRI is a research/academic prototype and is not a clinically validated diagnostic system.
 
 ---
 
-## 🖥️ Dashboard Preview
+## 🧠 Project Overview
 
-![Axial MRI Layer Scan](docs/dashboard4.png)
-*Raw MRI Scan and Segmentation Mask Overlay*
+The system processes a brain MRI image through two complementary deep learning branches:
 
-![Region of Interest & Explainability](docs/dashboard1.png)
-*Isolated Region of Interest and Grad-CAM Model Focus*
+1. **Segmentation Branch**
+   - Uses Attention U-Net.
+   - Produces a binary tumor-region mask.
+   - Helps visualize the detected tumor region.
 
-![Probability Distribution & Clinical Details](docs/dashboard3.png)
-*Confidence probability distribution and detailed clinical summary.*
+2. **Classification Branch**
+   - Uses EfficientNetV2B0 with transfer learning.
+   - Classifies the MRI into four categories:
+     - Glioma
+     - Meningioma
+     - Pituitary
+     - No Tumor
 
----
-## 🚀 Live Demo
+3. **Explainability**
+   - Uses Grad-CAM to visualize image regions that contributed to the classifier's prediction.
 
-**Check out the live dashboard:** [NeuroScan Analytics Dashboard](https://neuroscan-analytics.streamlit.app/)
----
-
-## 🌟 Core Features
-
-- **Segmentation (Attention U-Net)**: A custom SeparableConv2D-based U-Net (224×224 resolution) enhanced with Attention Gates to focus on tumor regions of varying shapes and sizes. Trained with a combined BCE + Dice Loss to handle class imbalance between tumor and background pixels.
-- **Classification (EfficientNetV2)**: An EfficientNetV2B0 backbone fine-tuned via transfer learning to categorize scans into four classes — Glioma, Meningioma, Pituitary, or No Tumor.
-- **Explainable AI (Grad-CAM)**: Gradient-weighted Class Activation Mapping generates heatmaps over the input scan, highlighting which regions most influenced the classification decision.
-- **Dashboard & API**: A Streamlit dashboard for interactive use, and a FastAPI backend exposing a prediction endpoint. Both are containerized with Docker via `docker-compose`.
-
----
-
-## 📊 Model Performance (Evaluated on Held-out Sets)
-
-**Pathology Classifier (EfficientNetV2B0)**
-
-Overall test accuracy: **94.06%** (1,600 held-out test images, 4 classes)
-
-| Class | Precision | Recall | F1-Score |
-|---|---|---|---|
-| Glioma | 0.98 | 0.80 | 0.88 |
-| Meningioma | 0.90 | 0.97 | 0.93 |
-| Pituitary | 0.98 | 1.00 | 0.99 |
-| No Tumor | 0.91 | 1.00 | 0.95 |
-
-The classifier performs strongly across all classes, with Glioma recall (0.80) being the main area for improvement — gliomas are occasionally confused with meningioma or no-tumor scans, likely due to overlapping visual presentation on certain slices.
-
-**Region Extractor (Attention U-Net)**
-
-- Dice Coefficient: **0.7767**
-- Pixel Accuracy: **99.84%**
-- Mean IoU: **0.4957**
-
-Dice coefficient is the primary segmentation metric here, since pixel accuracy is inflated by the large proportion of background pixels in brain MRI scans. Mean IoU is computed on thresholded binary masks and is more conservative than Dice for this task; a Dice score of ~0.78 represents strong tumor-region overlap given the irregular shapes of gliomas.
+4. **Web Application**
+   - Streamlit dashboard for interactive MRI analysis.
+   - FastAPI inference endpoint for programmatic predictions.
 
 ---
 
-## 🛠️ System Components
+## 🏗️ Architecture
 
-| Subsystem | Technology | Details |
-|-----------|----------------------|---------|
-| **Region Extractor** | Attention U-Net | `SeparableConv2D` + Attention Gates, trained with BCE + Dice Loss |
-| **Pathology Classifier** | EfficientNetV2B0 | ImageNet-pretrained base + custom GlobalAvgPool dense head |
-| **Explainability (XAI)** | Grad-CAM | Heatmap generation over the final convolutional layer |
-| **Inference API** | FastAPI | RESTful API exposing `/api/v1/predict` |
-| **Data Pipeline** | `tf.data` API | Caching, prefetching, and stochastic augmentation |
-| **Dashboard** | Streamlit + Plotly | Upload scans, view segmentation masks, classification confidence, and Grad-CAM heatmaps |
+```text
+                         ┌──────────────────────┐
+                         │      MRI IMAGE       │
+                         └──────────┬───────────┘
+                                    │
+                           Image Validation
+                                    │
+                    ┌───────────────┴───────────────┐
+                    │                               │
+                    ▼                               ▼
+          ┌───────────────────┐           ┌────────────────────┐
+          │   SEGMENTATION    │           │   CLASSIFICATION   │
+          │      BRANCH       │           │       BRANCH       │
+          └─────────┬─────────┘           └──────────┬─────────┘
+                    │                                │
+                    ▼                                ▼
+          Grayscale Preprocessing            RGB Preprocessing
+                    │                                │
+                    ▼                                ▼
+          ┌───────────────────┐           ┌────────────────────┐
+          │   Attention U-Net │           │  EfficientNetV2B0  │
+          └─────────┬─────────┘           └──────────┬─────────┘
+                    │                                │
+                    ▼                                ▼
+             Binary Tumor Mask                4-Class Prediction
+                    │                                │
+                    │                       ┌────────┴─────────┐
+                    │                       │                  │
+                    │                       ▼                  ▼
+                    │                 Predicted Class       Grad-CAM
+                    │                       │             Explanation
+                    │                       │                  │
+                    └───────────────┬───────┴──────────────────┘
+                                    │
+                                    ▼
+                         ┌──────────────────────┐
+                         │ Streamlit Dashboard  │
+                         │      + FastAPI       │
+                         └──────────────────────┘
+                         Important Architecture Detail
 
----
-## 🛠️ Tech Stack
+The segmentation and classification models operate as separate branches.
 
-### 🤖 Deep Learning & Machine Learning
-| Category | Technologies |
-|-----------|-------------|
-| Frameworks | TensorFlow v2.20.0, Keras v3.13.2 |
-| Computer Vision | OpenCV (opencv-python-headless), Pillow (PIL) |
-| Data Science | NumPy, pandas, scikit-learn |
-| Model Storage | h5py (HDF5/Keras model checkpoints) |
+The segmentation mask is used for tumor-region visualization and is not directly passed as input to the EfficientNetV2B0 classifier.
 
-### 🖥️ Application & API Layer
-| Category | Technologies |
-|-----------|-------------|
-| Web Dashboard | Streamlit v1.48.1 |
-| Backend API | FastAPI v0.109.0, Uvicorn |
-| Data Visualization | Plotly |
+The classifier receives the original MRI image through its RGB preprocessing pipeline.
 
-### ⚙️ Tooling & Infrastructure
-| Category | Technologies |
-|-----------|-------------|
-| Containerization | Docker, Docker Compose |
-| Testing | pytest |
-| Configuration Management | YAML (PyYAML), python-dotenv (.env) |
+🖥️ Dashboard Preview
+MRI Scan and Segmentation
 
----
+Raw MRI scan with predicted segmentation mask overlay.
 
-### 🚀 Technology Overview
+Region Visualization and Grad-CAM
 
-<p align="left">
-  <img src="https://img.shields.io/badge/TensorFlow-FF6F00?style=for-the-badge&logo=tensorflow&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Keras-D00000?style=for-the-badge&logo=keras&logoColor=white"/>
-  <img src="https://img.shields.io/badge/OpenCV-5C3EE8?style=for-the-badge&logo=opencv&logoColor=white"/>
-  <img src="https://img.shields.io/badge/NumPy-013243?style=for-the-badge&logo=numpy&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Pandas-150458?style=for-the-badge&logo=pandas&logoColor=white"/>
-  <img src="https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikitlearn&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white"/>
-  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Plotly-3F4F75?style=for-the-badge&logo=plotly&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white"/>
-  <img src="https://img.shields.io/badge/pytest-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white"/>
-</p>
+Tumor-region visualization and Grad-CAM model-focus heatmap.
 
----
-## 🚀 Getting Started
+Classification Probability and Details
 
-### 1. Environment Setup
+Classification confidence distribution and analysis information.
 
-Ensure you have Python 3.9+ installed.
+🚀 Live Demo
 
-```bash
-git clone <repository-url>
-cd <repository-directory>
+NeuroScan Analytics Dashboard:
+
+https://neuroscan-analytics.streamlit.app/
+
+The live dashboard provides an interactive interface for uploading MRI scans and viewing:
+
+Tumor segmentation
+Tumor classification
+Confidence probabilities
+Grad-CAM visualization
+Analysis information
+🌟 Core Features
+🔬 1. Brain Tumor Segmentation
+
+The segmentation branch uses an Attention U-Net architecture based on convolutional layers and attention mechanisms.
+
+The model predicts a binary tumor-region mask from the MRI image.
+
+Training loss:
+
+BCE + Dice Loss
+
+The Dice component helps address the imbalance between tumor and background pixels.
+
+🧠 2. Multi-Class Tumor Classification
+
+The classification branch uses EfficientNetV2B0 with transfer learning.
+
+The model predicts one of four classes:
+
+Glioma
+Meningioma
+Pituitary
+No Tumor
+
+The classifier uses the original MRI image after RGB preprocessing.
+
+🔎 3. Grad-CAM Explainability
+
+Grad-CAM is used to generate a heatmap showing regions of the MRI image that contributed to the classification prediction.
+
+The heatmap is intended as an interpretability aid rather than a clinically validated tumor boundary.
+
+🖥️ 4. Interactive Dashboard
+
+The Streamlit application provides:
+
+MRI image upload
+Segmentation visualization
+Classification prediction
+Confidence/probability display
+Grad-CAM visualization
+Analysis history/interface components
+⚡ 5. FastAPI Inference Layer
+
+A FastAPI application provides an inference endpoint for integrating the trained models with other applications.
+
+/api/v1/predict
+📊 Model Performance
+
+The following results are reported for the held-out evaluation sets used for the current project results.
+
+Classification — EfficientNetV2B0
+
+Overall Test Accuracy: 94.06%
+
+Test set: 1,600 held-out MRI images
+
+Number of classes: 4
+
+Class	Precision	Recall	F1-Score
+Glioma	0.98	0.80	0.88
+Meningioma	0.90	0.97	0.93
+Pituitary	0.98	1.00	0.99
+No Tumor	0.91	1.00	0.95
+
+The class-level metrics show that performance varies across tumor categories, with Glioma having lower recall than the other reported classes.
+
+Segmentation — Attention U-Net
+Metric	Result
+Pixel Accuracy	99.29%
+Dice Coefficient	76.41%
+Mean IoU	49.14%
+
+Pixel accuracy should be interpreted carefully because MRI segmentation contains a large number of background pixels.
+
+For tumor-region overlap, the Dice coefficient provides a more informative measure of segmentation quality.
+
+🛠️ System Components
+Subsystem	Technology	Purpose
+Segmentation	Attention U-Net	Predicts binary tumor-region mask
+Classification	EfficientNetV2B0	Four-class MRI classification
+Explainability	Grad-CAM	Visualizes classifier focus
+Dashboard	Streamlit	Interactive MRI analysis interface
+API	FastAPI	Prediction/inference endpoint
+Visualization	Plotly	Charts and confidence visualization
+Computer Vision	OpenCV	Image preprocessing
+Deep Learning	TensorFlow / Keras	Model development and inference
+Testing	pytest	Automated testing
+Containerization	Docker	Application containerization
+🧰 Technology Stack
+🤖 Deep Learning & Computer Vision
+Category	Technology
+Deep Learning Framework	TensorFlow
+Neural Network API	Keras
+Segmentation Model	Attention U-Net
+Classification Model	EfficientNetV2B0
+Explainability	Grad-CAM
+Computer Vision	OpenCV
+Image Processing	Pillow
+Numerical Computing	NumPy
+Data Processing	pandas
+Machine Learning Utilities	scikit-learn
+🖥️ Application Layer
+Category	Technology
+Web Dashboard	Streamlit
+Backend API	FastAPI
+ASGI Server	Uvicorn
+Visualization	Plotly
+Configuration	YAML / PyYAML
+Environment Variables	python-dotenv
+⚙️ Infrastructure & Testing
+Category	Technology
+Containerization	Docker
+Service Orchestration	Docker Compose
+Testing	pytest
+Model Format	Keras .keras
+🚀 Getting Started
+1. Clone the Repository
+git clone https://github.com/omkarDhamgunde766/NeuroScan_MRI.git
+cd NeuroScan_MRI
+2. Create a Virtual Environment
+Windows
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-### 2. Configuration
-
-NeuroScan is driven by `config.yaml`. Modify hyperparameters and dataset paths directly, or override them using environment variables (see `.env.example`).
-
-```bash
-cp .env.example .env
-# Edit .env with your dataset paths
-```
-
-### 3. Model Training
-
-```bash
-# Train the segmentation model
-python scripts/train_segmenter.py --config config.yaml
-
-# Train the classification model
-python scripts/train_classifier.py --config config.yaml
-```
-
-### 4. Running the Dashboard and API
-
-**Local (Streamlit only):**
-```bash
-python -m streamlit run app/dashboard.py
-```
-
-**Containerized (Dashboard + API):**
-```bash
-docker-compose up --build
-```
-- API available at: `http://localhost:8000`
-- Dashboard available at: `http://localhost:8501`
-
----
-
-## 🧪 Testing
-
-Activate the virtual environment first, then run:
-
-```bash
-# On Windows
 venv\Scripts\activate
+Linux / macOS
+python3 -m venv venv
+source venv/bin/activate
+3. Install Dependencies
+pip install -r requirements.txt
+4. Configure the Project
+
+The project uses:
+
+config.yaml
+
+Dataset paths are configured through the project configuration.
+
+Expected dataset structure:
+
+data/
+└── raw/
+    ├── classification/
+    │   ├── training/
+    │   │   ├── Glioma/
+    │   │   ├── Meningioma/
+    │   │   ├── NoTumor/
+    │   │   └── Pituitary/
+    │   │
+    │   └── testing/
+    │       ├── Glioma/
+    │       ├── Meningioma/
+    │       ├── NoTumor/
+    │       └── Pituitary/
+    │
+    └── segmentation/
+        ├── Glioma/
+        ├── Meningioma/
+        └── Pituitary/
+🧪 Model Training
+Train the Segmentation Model
+python -m scripts.train_segmenter --config config.yaml
+
+The trained segmentation model is saved under:
+
+checkpoints/neuroscan_seg.keras
+Train the Classification Model
+python -m scripts.train_classifier --config config.yaml
+
+The trained classification model is saved under:
+
+checkpoints/neuroscan_cls.keras
+🖥️ Running the Dashboard
+
+Activate the virtual environment first.
+
+python -m streamlit run app/dashboard.py
+
+The application will open in the browser.
+
+The dashboard allows the user to upload an MRI image and view:
+
+MRI Image
+   ↓
+Preprocessing
+   ↓
+Segmentation + Classification
+   ↓
+Tumor Mask + Predicted Class
+   ↓
+Grad-CAM Explanation
+   ↓
+Dashboard Visualization
+⚡ Running the API
+
+The FastAPI application is located at:
+
+app/api.py
+
+The API exposes the prediction endpoint:
+
+/api/v1/predict
+
+The exact server command depends on the application configuration.
+
+🐳 Docker
+
+The project also contains:
+
+Dockerfile
+docker-compose.yml
+
+To build and start the containerized services:
+
+docker-compose up --build
+
+Typical local service ports are:
+
+Dashboard: http://localhost:8501
+API:       http://localhost:8000
+🧪 Testing
+
+Activate the virtual environment and run:
 
 pytest tests/ -v
-```
 
-> **Note:** `test_api.py` requires `httpx` (included in `requirements.txt`). Ensure the venv is active before running tests so the correct package versions are used.
+The repository contains tests for major components including:
 
----
-
-## 📁 Repository Map
-
-```
-.
-├── config.yaml                  # Master hyperparameter configuration
-├── pyproject.toml               # Package build config & pytest settings
-├── conftest.py                  # Root pytest path setup
-├── requirements.txt             # Dependency graph
-├── docker-compose.yml           # Service orchestration
-├── Dockerfile                   # Container image definition
-├── app/                         # Frontend & Backend Applications
-│   ├── dashboard.py             # Streamlit entry point
-│   └── api.py                   # FastAPI application entry point
-├── neuroscan/                   # Core Package
-│   ├── config_loader.py         # YAML/Env var processor
-│   ├── data_pipeline.py         # tf.data.Dataset orchestrator
-│   ├── seg_model.py             # U-Net architecture definitions
-│   ├── cls_model.py             # EfficientNet architecture definitions
-│   ├── trainer.py               # Training loop and callbacks
-│   ├── inference.py             # End-to-end prediction pipeline
-│   ├── explainability.py        # Grad-CAM heatmap generation
-│   └── visualizer.py            # Plotly abstractions
-├── scripts/
-│   ├── evaluate_models.py       # Model evaluation script
-│   ├── generate_synthetic_data.py # Synthetic data generator
-│   ├── kaggle_train_script.py   # Kaggle training script
-│   ├── train_segmenter.py       # Segmentation CLI
-│   ├── train_classifier.py      # Classification CLI
-│   └── convert_tif_to_png.py    # Dataset format conversion utility
-├── checkpoints/                 # Saved model weights (.keras)
+Segmentation model
+Classification model
+Data pipeline
+Inference pipeline
+Explainability
+Visualization
+FastAPI
+📁 Repository Structure
+NeuroScan_MRI/
+│
+├── app/
+│   ├── dashboard.py
+│   └── api.py
+│
+├── checkpoints/
+│   ├── neuroscan_cls.keras
+│   └── neuroscan_seg.keras
+│
 ├── data/
 │   └── raw/
-│       ├── segmentation/        # LGG segmentation dataset (image + mask pairs)
-│       └── classification/      # Brain tumor classification dataset
-└── tests/                        # Pytest automation suite
-    ├── conftest.py
-    ├── test_seg_model.py
-    ├── test_cls_model.py
-    ├── test_data_pipeline.py
-    ├── test_inference.py
-    ├── test_explainability.py
-    ├── test_visualizer.py
-    └── test_api.py
-```
+│       ├── classification/
+│       └── segmentation/
+│
+├── docs/
+│   ├── dashboard1.png
+│   ├── dashboard2.png
+│   ├── dashboard3.png
+│   └── dashboard4.png
+│
+├── neuroscan/
+│   ├── __init__.py
+│   ├── config_loader.py
+│   ├── data_pipeline.py
+│   ├── seg_model.py
+│   ├── cls_model.py
+│   ├── trainer.py
+│   ├── inference.py
+│   ├── explainability.py
+│   └── visualizer.py
+│
+├── notebooks/
+│   └── neuroscan_kaggle_training.ipynb
+│
+├── scripts/
+│   ├── convert_tif_to_png.py
+│   ├── evaluate_models.py
+│   ├── generate_synthetic_data.py
+│   ├── kaggle_train_script.py
+│   ├── train_classifier.py
+│   └── train_segmenter.py
+│
+├── tests/
+│   ├── conftest.py
+│   ├── test_api.py
+│   ├── test_cls_model.py
+│   ├── test_data_pipeline.py
+│   ├── test_explainability.py
+│   ├── test_inference.py
+│   ├── test_seg_model.py
+│   └── test_visualizer.py
+│
+├── config.yaml
+├── Dockerfile
+├── docker-compose.yml
+├── pyproject.toml
+├── requirements.txt
+├── run_neuroscan.bat
+├── runtime.txt
+└── README.md
+🔬 Research Workflow
+             MRI Image
+                 │
+                 ▼
+        Image Validation
+                 │
+        ┌────────┴────────┐
+        │                 │
+        ▼                 ▼
+  Segmentation      Classification
+   Attention U-Net   EfficientNetV2B0
+        │                 │
+        ▼                 ▼
+   Tumor Mask       Tumor Class
+        │                 │
+        │             Grad-CAM
+        │                 │
+        └────────┬────────┘
+                 ▼
+        Streamlit Dashboard
+🔮 Future Improvements
 
----
+Possible future extensions include:
 
-## 🚀 Future Improvements
+3D MRI volume processing using NIfTI data
+Multi-modal MRI analysis using T1, T1Gd, T2 and FLAIR sequences
+Improved tumor-region segmentation
+Additional model validation on independent datasets
+More robust external validation
+Model calibration and uncertainty estimation
+Scalable deployment infrastructure
+Privacy-preserving/federated learning research
+⚠️ Research Disclaimer
 
-- **3D MRI Support**: Extend the pipeline to process 3D NIfTI volumes instead of 2D slices.
-- **Multimodal Fusion**: Integrate T1, T1Gd, T2, and FLAIR sequences simultaneously for richer feature extraction.
-- **Federated Learning**: Implement federated training to preserve patient data privacy across multiple clinical sites.
-- **Deployment**: Provide Kubernetes Helm charts for scalable enterprise deployment.
+NeuroScan-MRI is developed as an academic/research project for brain MRI image analysis.
 
----
-## 👤 Author
+The model predictions, segmentation masks, confidence values, and Grad-CAM visualizations should not be interpreted as a medical diagnosis.
 
-**Ashmit Kumar Srivastav**  
-GitHub: [@Ashmit](https://github.com/Ashmit76311)
+Clinical deployment would require appropriate medical validation, independent testing, regulatory approval, data governance, and evaluation by qualified medical professionals.
+
+👤 Author
+
+Omkar Dhamgunde
+
+GitHub:
+
+https://github.com/omkarDhamgunde766
+
+📄 Project Repository
+
+NeuroScan-MRI
+
+GitHub Repository:
+
+https://github.com/omkarDhamgunde766/NeuroScan_MRI
+
+⭐ Acknowledgement
+
+This project was developed as an academic/final-year project focused on applying deep learning techniques to brain MRI tumor segmentation, classification, and explainability.
+
+
+### One correction I intentionally made
+
+Your old README had this flow:
+
+```text
+MRI
+ ↓
+Attention U-Net
+ ↓
+ROI Extraction
+ ↓
+EfficientNetV2B0
+
+That doesn't match your current implementation. Your current project has:
+
+                    MRI
+                     ↓
+             ┌───────┴───────┐
+             ↓               ↓
+        Attention U-Net   EfficientNetV2B0
+             ↓               ↓
+        Tumor Mask       Classification
+                             ↓
+                          Grad-CAM
